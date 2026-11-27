@@ -23,9 +23,16 @@ wrap an unchecked value in one. A value becomes one through a door that checks
 it:
 
 - `JsonObject.decode(text)` for wire text. A `FormatException` when the text
-  is not JSON, or is JSON of another kind.
+  is not JSON, is JSON of another kind, has an object that names the same
+  key twice, or has an integer past 2^53 - 1 in size, which a web build reads
+  inexactly. A number written with a `.` or an exponent is a double and is
+  rounded to the nearest one, the same on every platform.
 - `JsonObject.parse(value)` for a value that is already decoded. Null when it
-  is not a JSON object.
+  is not a JSON object. A duplicate's value is already gone from a decoded
+  value, and a big integer already rounded on the web, so for wire text of
+  any kind decode it with
+  `decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text)` rather than
+  `jsonDecode`.
 - `object(k)` and `objects(k)` for an object nested in another.
 - `JsonObject.of(map)` for an object you build yourself, for a `toJson`, from
   a map whose static type is already string-keyed.
