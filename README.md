@@ -23,9 +23,13 @@ wrap an unchecked value in one. A value becomes one through a door that checks
 it:
 
 - `JsonObject.decode(text)` for wire text. A `FormatException` when the text
-  is not JSON, or is JSON of another kind.
+  is not JSON, is JSON of another kind, or has an object that names the same
+  key twice.
 - `JsonObject.parse(value)` for a value that is already decoded. Null when it
-  is not a JSON object.
+  is not a JSON object. A duplicate key is already gone from a decoded value,
+  so for wire text of any kind decode it with
+  `decodeJsonRefusingDuplicateKeys(text)` rather than `jsonDecode`, which keeps
+  the last value without a word.
 - `object(k)` and `objects(k)` for an object nested in another.
 - `JsonObject.of(map)` for an object you build yourself, for a `toJson`, from
   a map whose static type is already string-keyed.

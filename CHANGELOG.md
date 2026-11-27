@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+- **Breaking:** `JsonObject.decode` refuses text in which an object, at any
+  depth, names the same key twice. `jsonDecode` keeps the last value and drops
+  the other without a word; this is now a `FormatException`
+  (`duplicate key "k"`, its `offset` at the second key). Keys are compared
+  once unescaped, so a plain `a` and its `\u` escape collide. The same key in
+  two different objects is fine. Values decode exactly as `jsonDecode`
+  decodes them, on the VM and on the web.
+- Add `decodeJsonRefusingDuplicateKeys(text)`: the same refusal for wire text
+  of any JSON kind. Replace `JsonObject.parse(jsonDecode(text))`, and a
+  `jsonDecode` of a list of objects, with it, since `JsonObject.parse` gets a
+  value whose duplicate is already gone.
+
 ## 0.2.1
 
 - Add `deepFrozen()`: a copy all the way down that refuses changes. Every

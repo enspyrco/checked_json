@@ -1,5 +1,6 @@
 import 'dart:collection';
-import 'dart:convert';
+
+import 'decode_json.dart';
 
 /// A JSON object: string keys, JSON values, read through the readers below.
 /// Holding one means the shape was checked, so nothing downstream checks it
@@ -49,9 +50,11 @@ extension type const JsonObject._(Map<String, Object?> _fields)
       JsonObject._({for (final p in parts) ...p._fields});
 
   /// [text] decoded as a JSON object. A [FormatException] when it is not
-  /// JSON, or is JSON of another kind (a list, a string, a number, null).
+  /// JSON, is JSON of another kind (a list, a string, a number, null), or
+  /// has an object at any depth that names the same key twice; see
+  /// [decodeJsonRefusingDuplicateKeys].
   factory JsonObject.decode(String text) =>
-      parse(jsonDecode(text)) ??
+      parse(decodeJsonRefusingDuplicateKeys(text)) ??
       (throw const FormatException('not a JSON object'));
 
   /// [value] as a JSON object, or null when it is anything else. For a
