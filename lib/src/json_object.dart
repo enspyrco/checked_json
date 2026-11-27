@@ -50,11 +50,11 @@ extension type const JsonObject._(Map<String, Object?> _fields)
       JsonObject._({for (final p in parts) ...p._fields});
 
   /// [text] decoded as a JSON object. A [FormatException] when it is not
-  /// JSON, is JSON of another kind (a list, a string, a number, null), or
-  /// would lose part of what was written (a key named twice, an integer past
-  /// 2^53 - 1); see [decodeJsonLosingNothing].
+  /// JSON, is JSON of another kind (a list, a string, a number, null), names
+  /// a key twice in one object, or has an integer past 2^53 - 1; see
+  /// [decodeJsonRefusingDuplicateKeysAndUnsafeIntegers].
   factory JsonObject.decode(String text) =>
-      parse(decodeJsonLosingNothing(text)) ??
+      parse(decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text)) ??
       (throw const FormatException('not a JSON object'));
 
   /// [value] as a JSON object, or null when it is anything else. For a

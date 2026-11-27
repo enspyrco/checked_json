@@ -1,8 +1,7 @@
 import 'dart:convert';
 
 /// [text] decoded as any JSON value, as `jsonDecode` decodes it, except that
-/// text whose decoding would lose part of what was written is a
-/// [FormatException] instead:
+/// two kinds of text are a [FormatException] instead:
 ///
 /// - An object naming the same key twice, which `jsonDecode` keeps only the
 ///   last value of. Two keys are the same when they are the same once
@@ -11,15 +10,21 @@ import 'dart:convert';
 /// - An integer written without a fraction or exponent whose size is past
 ///   2^53 - 1 (JavaScript's `Number.MAX_SAFE_INTEGER`). A web build reads it
 ///   as the nearest double, so `9007199254740993` comes out one less there
-///   than on the VM. A number written with a `.` or an exponent is a double
-///   on every platform and is decoded as one.
+///   than on the VM.
+///
+/// A number written with a `.` or an exponent is a double, and is rounded to
+/// the nearest one as `jsonDecode` rounds it, the same on every platform:
+/// `9007199254740993.0` decodes as `9007199254740992.0`, and digits past a
+/// double's precision are dropped.
 ///
 /// For wire text whose kind is not known until it is looked at, such as a
-/// list of objects: `JsonObject.parse(decodeJsonLosingNothing(text))` where
-/// `JsonObject.parse(jsonDecode(text))` would lose a value without a word.
-Object? decodeJsonLosingNothing(String text) {
+/// list of objects:
+/// `JsonObject.parse(decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text))`
+/// where `JsonObject.parse(jsonDecode(text))` would drop a duplicate's value
+/// without a word.
+Object? decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(String text) {
   final value = jsonDecode(text);
-  _refuseLoss(text);
+  _refuseDuplicateKeysAndUnsafeIntegers(text);
   return value;
 }
 
@@ -27,7 +32,7 @@ Object? decodeJsonLosingNothing(String text) {
 /// second time, or the first integer past 2^53 - 1 in size. [text] is JSON
 /// that `jsonDecode` has already accepted, so this walks its structure
 /// without checking its syntax again.
-void _refuseLoss(String text) {
+void _refuseDuplicateKeysAndUnsafeIntegers(String text) {
   // One entry per open object or list: the keys an object has named so far,
   // or null for a list.
   final open = <Set<String>?>[];

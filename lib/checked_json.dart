@@ -1,6 +1,6 @@
 /// A JSON object you only get by checking a value: [JsonObject], its typed
 /// readers, and the [JsonFieldException] they throw naming the field; and
-/// [decodeJsonLosingNothing] for wire text of any JSON kind.
+/// [decodeJsonRefusingDuplicateKeysAndUnsafeIntegers] for wire text of any JSON kind.
 library;
 
 export 'src/decode_json.dart';

@@ -12,10 +12,12 @@
 - **Breaking:** `JsonObject.decode` refuses an integer, written without a
   fraction or exponent, whose size is past 2^53 - 1. A web build reads one as
   the nearest double, so `9007199254740993` decoded one less there than on
-  the VM. Write a number that size with a `.` or exponent to send it as a
-  double, or as a string to keep every digit.
-- Add `decodeJsonLosingNothing(text)`: both refusals for wire text
-  of any JSON kind. Replace `JsonObject.parse(jsonDecode(text))`, and a
+  the VM. Write a number that size as a string to keep every digit. One
+  written with a `.` or exponent is a double, rounded to the nearest one
+  (`9007199254740993.0` is `9007199254740992.0`) the same everywhere, and
+  passes.
+- Add `decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text)`: both
+  refusals for wire text of any JSON kind. Replace `JsonObject.parse(jsonDecode(text))`, and a
   `jsonDecode` of a list of objects, with it, since `JsonObject.parse` gets a
   value whose duplicate is already gone.
 

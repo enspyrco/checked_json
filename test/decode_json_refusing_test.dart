@@ -37,7 +37,8 @@ void main() {
       ('after a nested object closes', '{"a": {"k": 1}, "k": 1, "a": 2}', 'a'),
     ]) {
       test(name, () {
-        expect(() => decodeJsonLosingNothing(text), throwsA(_duplicate(key)));
+        expect(() => decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text),
+            throwsA(_duplicate(key)));
         if (text.startsWith('{')) {
           expect(() => JsonObject.decode(text), throwsA(_duplicate(key)));
         }
@@ -66,7 +67,8 @@ void main() {
       ('whitespace everywhere', ' \n{ "a" :\t[ 1 , { "a" : 2 } ] }\r\n'),
     ]) {
       test(name, () {
-        expect(decodeJsonLosingNothing(text), jsonDecode(text));
+        expect(decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text),
+            jsonDecode(text));
       });
     }
   });
@@ -80,7 +82,7 @@ void main() {
     ]) {
       test(name, () {
         expect(
-          () => decodeJsonLosingNothing(text),
+          () => decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text),
           throwsA(isA<FormatException>()
               .having((e) => e.message, 'message', contains('2^53 - 1'))
               .having((e) => e.offset, 'offset', offset)),
@@ -110,7 +112,8 @@ void main() {
       ('zero and minus zero', '[0, -0, 0.0]'),
     ]) {
       test(name, () {
-        expect(decodeJsonLosingNothing(text), jsonDecode(text));
+        expect(decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text),
+            jsonDecode(text));
       });
     }
   });
@@ -118,13 +121,14 @@ void main() {
   test('the offset points at the second key', () {
     const text = '{"a": 1, "a": 2}';
     expect(
-      () => decodeJsonLosingNothing(text),
+      () => decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text),
       throwsA(isA<FormatException>().having((e) => e.offset, 'offset', 9)),
     );
   });
 
   test('text that is not JSON fails as jsonDecode fails', () {
-    expect(() => decodeJsonLosingNothing('{"a": '), throwsFormatException);
+    expect(() => decodeJsonRefusingDuplicateKeysAndUnsafeIntegers('{"a": '),
+        throwsFormatException);
     expect(() => JsonObject.decode('{"a": '), throwsFormatException);
   });
 
