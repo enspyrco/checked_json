@@ -9,7 +9,12 @@
   once unescaped, so a plain `a` and its `\u` escape collide. The same key in
   two different objects is fine. Values decode exactly as `jsonDecode`
   decodes them, on the VM and on the web.
-- Add `decodeJsonRefusingDuplicateKeys(text)`: the same refusal for wire text
+- **Breaking:** `JsonObject.decode` refuses an integer, written without a
+  fraction or exponent, whose size is past 2^53 - 1. A web build reads one as
+  the nearest double, so `9007199254740993` decoded one less there than on
+  the VM. Write a number that size with a `.` or exponent to send it as a
+  double, or as a string to keep every digit.
+- Add `decodeJsonLosingNothing(text)`: both refusals for wire text
   of any JSON kind. Replace `JsonObject.parse(jsonDecode(text))`, and a
   `jsonDecode` of a list of objects, with it, since `JsonObject.parse` gets a
   value whose duplicate is already gone.

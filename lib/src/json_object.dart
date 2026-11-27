@@ -51,10 +51,10 @@ extension type const JsonObject._(Map<String, Object?> _fields)
 
   /// [text] decoded as a JSON object. A [FormatException] when it is not
   /// JSON, is JSON of another kind (a list, a string, a number, null), or
-  /// has an object at any depth that names the same key twice; see
-  /// [decodeJsonRefusingDuplicateKeys].
+  /// would lose part of what was written (a key named twice, an integer past
+  /// 2^53 - 1); see [decodeJsonLosingNothing].
   factory JsonObject.decode(String text) =>
-      parse(decodeJsonRefusingDuplicateKeys(text)) ??
+      parse(decodeJsonLosingNothing(text)) ??
       (throw const FormatException('not a JSON object'));
 
   /// [value] as a JSON object, or null when it is anything else. For a

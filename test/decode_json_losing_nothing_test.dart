@@ -37,8 +37,7 @@ void main() {
       ('after a nested object closes', '{"a": {"k": 1}, "k": 1, "a": 2}', 'a'),
     ]) {
       test(name, () {
-        expect(() => decodeJsonRefusingDuplicateKeys(text),
-            throwsA(_duplicate(key)));
+        expect(() => decodeJsonLosingNothing(text), throwsA(_duplicate(key)));
         if (text.startsWith('{')) {
           expect(() => JsonObject.decode(text), throwsA(_duplicate(key)));
         }
@@ -67,7 +66,51 @@ void main() {
       ('whitespace everywhere', ' \n{ "a" :\t[ 1 , { "a" : 2 } ] }\r\n'),
     ]) {
       test(name, () {
-        expect(decodeJsonRefusingDuplicateKeys(text), jsonDecode(text));
+        expect(decodeJsonLosingNothing(text), jsonDecode(text));
+      });
+    }
+  });
+
+  group('an integer past 2^53 - 1 in size is refused', () {
+    for (final (name, text, offset) in [
+      ('one past', '9007199254740992', 0),
+      ('the brief case', '[9007199254740993]', 1),
+      ('negative', '{"n": -9007199254740992}', 6),
+      ('longer', '{"a": [1, 123456789012345678901]}', 10),
+    ]) {
+      test(name, () {
+        expect(
+          () => decodeJsonLosingNothing(text),
+          throwsA(isA<FormatException>()
+              .having((e) => e.message, 'message', contains('2^53 - 1'))
+              .having((e) => e.offset, 'offset', offset)),
+        );
+      });
+    }
+    test('through JsonObject.decode', () {
+      expect(() => JsonObject.decode('{"n": 9007199254740993}'),
+          throwsFormatException);
+    });
+  });
+
+  group('numbers that decode the same everywhere pass', () {
+    for (final (name, text) in [
+      ('2^53 - 1', '[9007199254740991, -9007199254740991]'),
+      ('a big number with a fraction', '[9007199254740993.0]'),
+      ('a big number with an exponent', '[1e300, 9007199254740993e0]'),
+      ('a long fraction', '[0.12345678901234567890123]'),
+      (
+        'a long exponent',
+        '[1e-0000000000000000000001, 2E+00000000000000000001]'
+      ),
+      (
+        'digits in a key and a string',
+        '{"12345678901234567890": "99999999999999999"}'
+      ),
+      ('zero and minus zero', '[0, -0, 0.0]'),
+    ]) {
+      test(name, () {
+        expect(decodeJsonLosingNothing(text), jsonDecode(text));
       });
     }
   });
@@ -75,14 +118,13 @@ void main() {
   test('the offset points at the second key', () {
     const text = '{"a": 1, "a": 2}';
     expect(
-      () => decodeJsonRefusingDuplicateKeys(text),
+      () => decodeJsonLosingNothing(text),
       throwsA(isA<FormatException>().having((e) => e.offset, 'offset', 9)),
     );
   });
 
   test('text that is not JSON fails as jsonDecode fails', () {
-    expect(
-        () => decodeJsonRefusingDuplicateKeys('{"a": '), throwsFormatException);
+    expect(() => decodeJsonLosingNothing('{"a": '), throwsFormatException);
     expect(() => JsonObject.decode('{"a": '), throwsFormatException);
   });
 
