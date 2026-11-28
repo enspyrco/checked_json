@@ -34,6 +34,48 @@ void main() {
     });
   });
 
+  group('decodeJsonRefusingDuplicateKeysAndUnsafeIntegers', () {
+    test('refuses a top-level list nested past the limit', () {
+      final deep = '${'[' * (limit + 1)}${']' * (limit + 1)}';
+      expect(() => decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(deep),
+          throwsFormatException);
+      final atLimit = '${'[' * limit}${']' * limit}';
+      expect(decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(atLimit),
+          isA<List<Object?>>());
+    });
+
+    test('takes and refuses exactly what JsonObject.decode does', () {
+      final texts = [
+        for (final n in [1, 2, limit - 1, limit, limit + 1, 5000, 100000]) ...[
+          nestedObjects(n),
+          nestedLists(n),
+        ],
+        // Brackets inside a string are not nesting.
+        '{"a":"${'[' * (limit + 1)}"}',
+      ];
+      bool refuses(Object? Function() decode) {
+        try {
+          decode();
+          return false;
+        } on FormatException {
+          return true;
+        }
+      }
+
+      for (final t in texts) {
+        expect(
+          refuses(() => decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(t)),
+          refuses(() => JsonObject.decode(t)),
+          reason:
+              '${t.length} characters: ${t.substring(0, t.length.clamp(0, 12))}',
+        );
+      }
+      expect(refuses(() => JsonObject.decode(nestedObjects(limit))), isFalse);
+      expect(
+          refuses(() => JsonObject.decode(nestedObjects(limit + 1))), isTrue);
+    });
+  });
+
   group('parse', () {
     test('takes a decoded value nested exactly to the limit', () {
       expect(JsonObject.parse(jsonDecode(nestedObjects(limit))),

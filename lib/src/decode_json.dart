@@ -1,7 +1,16 @@
 import 'dart:convert';
 
+/// The most objects and lists one inside another, counting the outermost:
+/// `{"a": [{}]}` is 3 deep. [decodeJsonRefusingDuplicateKeysAndUnsafeIntegers]
+/// and every way into a `JsonObject` refuse anything deeper with a
+/// [FormatException], since walking it (in a copy, in `jsonEncode`, in `==`,
+/// in a recursive `fromJson`) would run out of stack with a
+/// `StackOverflowError`, which `on FormatException` does not catch.
+/// `jsonEncode` itself runs out somewhere between 1,000 and 5,000 levels.
+const jsonObjectNestingLimit = 512;
+
 /// [text] decoded as any JSON value, as `jsonDecode` decodes it, except that
-/// two kinds of text are a [FormatException] instead:
+/// three kinds of text are a [FormatException] instead:
 ///
 /// - An object naming the same key twice, which `jsonDecode` keeps only the
 ///   last value of. Two keys are the same when they are the same once
@@ -11,6 +20,9 @@ import 'dart:convert';
 ///   2^53 - 1 (JavaScript's `Number.MAX_SAFE_INTEGER`). A web build reads it
 ///   as the nearest double, so `9007199254740993` comes out one less there
 ///   than on the VM.
+/// - Objects and lists nested more than [jsonObjectNestingLimit] deep, which
+///   would end the program with a `StackOverflowError` in the first thing
+///   that walks them. Every way into a `JsonObject` refuses the same.
 ///
 /// A number written with a `.` or an exponent is a double, and is rounded to
 /// the nearest one as `jsonDecode` rounds it, the same on every platform:
@@ -78,6 +90,13 @@ List<({int start, int end})> _refuseDuplicateKeysAndUnsafeIntegers(
   var i = 0;
   while (i < text.length) {
     switch (text.codeUnitAt(i)) {
+      case _openBrace || _openBracket
+          when open.length >= jsonObjectNestingLimit:
+        throw FormatException(
+          'objects and lists nested more than $jsonObjectNestingLimit deep',
+          text,
+          i,
+        );
       case _openBrace:
         open.add(<String>{});
         expectingKey = true;
