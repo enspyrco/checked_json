@@ -29,6 +29,6 @@ void main() {
   print(JsonObject.parse(decoded)); // null: a list, not an object
 
   // An object we build ourselves, for a `toJson`.
-  const reply = JsonObject.of({'ok': true});
+  final reply = JsonObject.of({'ok': true});
   print(jsonEncode(reply)); // {"ok":true}
 }

@@ -34,8 +34,13 @@ it:
   `decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text)` rather than
   `jsonDecode`.
 - `object(k)` and `objects(k)` for an object nested in another.
-- `JsonObject.of(map)` for an object you build yourself, for a `toJson`, from
-  a map whose static type is already string-keyed.
+- `JsonObject.of(map)` for an object you build yourself, for a `toJson`. It
+  copies the map all the way down, and refuses (naming where) any value
+  `jsonEncode` couldn't write: a `DateTime`, `NaN`, a key that is not a
+  string.
+- `MutableJsonObject` for one built up field by field: a map you can write
+  to, which checks and copies each value as it is written. `toJsonObject()`
+  turns it into a `JsonObject`, and `obj.toMutable()` goes the other way.
 
 ## The readers
 
@@ -57,8 +62,6 @@ final streaming = body.withFields({'stream': true});   // fields laid over
 final request = JsonObject.merge([common, if (effort != null) effort]);
                                                         // later parts win
 final plain = streaming.without({'stream'});            // fields dropped
-final kept = plain.frozen();                            // read-only copy
-final schema = tool.deepFrozen();                       // read-only all the way down
 ```
 
 For an object used as a dictionary, whose keys are data rather than names the
@@ -68,15 +71,10 @@ code knows, `keys` gives the names and a reader reads each value:
 final prices = {for (final m in table.keys) m: table.number(m)};
 ```
 
-`frozen()` copies only the object itself, and nested objects and lists stay
-shared. `deepFrozen()` copies and protects every one of them, keeps field and
-list order, and refuses (with the path) any value `jsonEncode` couldn't write,
-including a key that is not a string.
-
-`jsonEncode` writes a `JsonObject` as it is, so encoding needs no map. The one
-way out to a `Map` is `asUncheckedMap()`, a read-only view for a parameter
-declared as a `Map`, as some other package's API is. A read from it is
-unchecked, which is what the name says.
+`jsonEncode` writes a `JsonObject` as it is, so encoding needs no map. A `JsonObject` is
+itself a read-only `Map`, so it can be passed where some other package's API
+wants one; `asUncheckedMap()` says at that call that what follows reads it
+unchecked.
 
 `JsonFieldException` extends `FormatException`: a bad field is a condition
 you're meant to catch, not a programming bug. Code that already catches
@@ -93,11 +91,17 @@ you're meant to catch, not a programming bug. Code that already catches
   map pattern and a test's map matcher read it as one. `obj['k']` compiles
   and is unchecked, so read a field through a reader. `obj['k'] = v` also
   compiles, and throws `UnsupportedError`.
+- **Nothing can change a `JsonObject`, all the way down.** Every object
+  inside it is a `JsonObject`, and every list inside it refuses changes,
+  whether it came from `list(k)`, `raw(k)` or `obj['k']`. `of`, `parse` and
+  `withFields` copy what they're given, so the caller's map can go on
+  changing without reaching it. `decode` copies nothing: the map it wraps
+  was never seen by anyone else.
 - **Two objects are equal when their fields are.** Fields compare in any
   order, all the way down, with `1` equal to `1.0` as in Dart. A
-  `JsonObject` never equals a plain map with the same fields. The hash is of
-  the fields as they are now, so don't keep one in a set while the map it
-  was made `of` is still changing.
+  `JsonObject` never equals a plain map with the same fields. A
+  `MutableJsonObject` compares by identity, since it can change after it is
+  put in a set.
 - **`parse` matches the map's runtime type.** `jsonDecode` always makes a
   string-keyed map, so its output is fine. A `Map<dynamic, dynamic>`, as YAML
   and Flutter platform channels deliver one, gives null even when every key is

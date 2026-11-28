@@ -61,11 +61,9 @@ void main() {
       expect(JsonObject.parse(outer.raw('o')), same(inner));
     });
 
-    test('by deepFrozen, as a map', () {
-      final frozen = outer.deepFrozen();
-      expect(frozen.raw('o'), {'b': 2});
-      expect(frozen.object('o').integer('b'), 2);
-      expect(jsonEncode(frozen), jsonEncode(outer));
+    test('by raw, and kept as itself, not copied', () {
+      expect(outer.raw('o'), same(inner));
+      expect(outer.objects('l').single, same(inner));
     });
   });
 
@@ -125,5 +123,5 @@ void main() {
 }
 
 final class _Verdict {
-  JsonObject toJson() => const JsonObject.of({'shape': 'approved'});
+  JsonObject toJson() => JsonObject.of({'shape': 'approved'});
 }

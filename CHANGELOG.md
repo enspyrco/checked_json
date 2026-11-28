@@ -1,13 +1,30 @@
 # Changelog
 
-## 0.3.1
+## 0.4.0
 
-- `JsonObject` is a final class that is a read-only `Map<String, Object?>`,
-  no longer an extension type. A map is never a `JsonObject` at runtime:
-  `map as JsonObject` throws a `TypeError` and `map is JsonObject` is false,
-  so only the doors make one. Code that cast or type-tested a decoded map
-  against `JsonObject` changes behaviour; `JsonObject.parse` is the door for
-  that. `jsonEncode` and map patterns read a `JsonObject` as before.
+- **Breaking:** nothing can change a `JsonObject`, all the way down. Every
+  object inside one is a `JsonObject` and every list inside refuses changes,
+  whichever reader or `raw` it comes out of; `strings` and `objects` give
+  lists that refuse changes too.
+- **Breaking:** `JsonObject.of` copies its map all the way down, so it is no
+  longer `const`: drop the `const` from `const JsonObject.of(...)`.
+  `JsonObject.empty` is still a constant. `of`, `parse` and `withFields`
+  refuse a value `jsonEncode` couldn't write (a `DateTime`, `NaN`, a key
+  that is not a string) with a `JsonFieldException` naming where it is.
+- **Breaking:** `frozen()`, `deepFrozen()` and `JsonObject.unmodifiable` are
+  gone, since every `JsonObject` is already what they made: drop the call.
+- New `MutableJsonObject`, a map you can write to for building one field by
+  field. It checks and copies each value as it is written, so a bad value
+  fails at the line that wrote it. `toJsonObject()` turns it into a
+  `JsonObject`, and `JsonObject.toMutable()` goes the other way. It is not a
+  `JsonObject`, and compares by identity.
+- **Breaking:** `JsonObject` is a final class that is a read-only
+  `Map<String, Object?>`, no longer an extension type. A map is never a
+  `JsonObject` at runtime: `map as JsonObject` throws a `TypeError` and
+  `map is JsonObject` is false, so only the doors make one. Code that cast
+  or type-tested a decoded map against `JsonObject` changes behaviour;
+  `JsonObject.parse` is the door for that. `jsonEncode` and map patterns
+  read a `JsonObject` as before.
 - `obj['k']` compiles again, and is unchecked; `obj['k'] = v` compiles and
   throws `UnsupportedError`.
 - Two `JsonObject`s are equal when their fields are equal, in any order and
