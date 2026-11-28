@@ -126,6 +126,11 @@ you're meant to catch, not a programming bug. Code that already catches
   refused, because `9007199254740993.0` decodes to it too.
 - **Nested values are not deep-checked up front.** A door checks that the
   value is an object; each field is checked when its reader reads it.
+- **Nesting stops at 512 levels.** An object holds at most
+  `jsonObjectNestingLimit` objects and lists one inside another, counting
+  itself, and every door refuses deeper input with a `FormatException`.
+  Without the limit, a 30 KB body nested 5,000 deep would end the program
+  with a `StackOverflowError`, here or in `jsonEncode`.
 
 ## Licence
 

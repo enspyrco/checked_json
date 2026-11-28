@@ -32,9 +32,17 @@ import 'decode_json.dart';
 /// A map is never a [JsonObject] at runtime, so `map as JsonObject` throws
 /// and `map is JsonObject` is false: the doors are the only way in.
 final class JsonObject extends UnmodifiableMapBase<String, Object?> {
-  const JsonObject._(this._fields);
+  const JsonObject._(this._fields, this._depth);
+
+  /// [fields], already frozen, as a [JsonObject] whose depth is measured.
+  JsonObject._frozen(Map<String, Object?> fields)
+      : this._(fields, 1 + _deepestValue(fields.values));
 
   final Map<String, Object?> _fields;
+
+  /// How many objects and lists deep this one goes, counting itself: `{}`
+  /// is 1 and `{"a": [{}]}` is 3. Never more than [jsonObjectNestingLimit].
+  final int _depth;
 
   /// A copy of [fields], all the way down, as a `toJson` returns one.
   ///
@@ -48,7 +56,7 @@ final class JsonObject extends UnmodifiableMapBase<String, Object?> {
   ///
   /// A [JsonObject] inside is kept as it is, since it cannot change.
   factory JsonObject.of(Map<String, Object?> fields) =>
-      JsonObject._(_frozenFields(fields));
+      JsonObject._frozen(_frozenFields(fields));
 
   @override
   Object? operator [](Object? key) => _fields[key];
@@ -78,12 +86,12 @@ final class JsonObject extends UnmodifiableMapBase<String, Object?> {
   String toString() => _fields.toString();
 
   /// The object with no fields.
-  static const empty = JsonObject._({});
+  static const empty = JsonObject._({}, 1);
 
   /// One object with the fields of each of [parts], in order: a later part's
   /// field takes the place of an earlier one's.
-  factory JsonObject.merge(Iterable<JsonObject> parts) =>
-      JsonObject._(Map.unmodifiable({for (final p in parts) ...p._fields}));
+  factory JsonObject.merge(Iterable<JsonObject> parts) => JsonObject._frozen(
+      Map.unmodifiable({for (final p in parts) ...p._fields}));
 
   /// [text] decoded as a JSON object. A [FormatException] when it is not
   /// JSON, is JSON of another kind (a list, a string, a number, null), names
@@ -99,7 +107,7 @@ final class JsonObject extends UnmodifiableMapBase<String, Object?> {
         text,
         integerFieldsAsStrings: integerFieldsAsStrings,
       )) {
-        final Map<String, Object?> m => _wrapDecodedObject(m),
+        final Map<String, Object?> m => _wrapDecodedObject(m, 1),
         _ => throw const FormatException('not a JSON object'),
       };
 
@@ -136,14 +144,14 @@ final class JsonObject extends UnmodifiableMapBase<String, Object?> {
   /// This object with [more] laid over it: a new field is added after the
   /// existing ones, and one already present takes the new value in place.
   /// [more] is copied as [JsonObject.of] copies a map.
-  JsonObject withFields(Map<String, Object?> more) =>
-      JsonObject._(Map.unmodifiable({..._fields, ..._frozenFields(more)}));
+  JsonObject withFields(Map<String, Object?> more) => JsonObject._frozen(
+      Map.unmodifiable({..._fields, ..._frozenFields(more)}));
 
   /// This object without the fields named in [keys]. A name that is absent
   /// is passed over.
   JsonObject without(Iterable<String> keys) {
     final drop = keys.toSet();
-    return JsonObject._(Map.unmodifiable({
+    return JsonObject._frozen(Map.unmodifiable({
       for (final MapEntry(:key, :value) in _fields.entries)
         if (!drop.contains(key)) key: value,
     }));
@@ -244,7 +252,7 @@ final class MutableJsonObject extends MapBase<String, Object?> {
   /// Sets [key] to a copy of [value], refused unless it is a JSON value.
   @override
   void operator []=(String key, Object? value) =>
-      _fields[key] = _frozen(value, key);
+      _fields[key] = _frozen(value, key, 1);
 
   @override
   Object? remove(Object? key) => _fields.remove(key);
@@ -263,7 +271,7 @@ final class MutableJsonObject extends MapBase<String, Object?> {
 
   /// The fields as they are now, as a [JsonObject]. A later change to this
   /// object does not reach it.
-  JsonObject toJsonObject() => JsonObject._(Map.unmodifiable(_fields));
+  JsonObject toJsonObject() => JsonObject._frozen(Map.unmodifiable(_fields));
 }
 
 /// A field that is absent, or present but not the shape its reader asked
@@ -281,46 +289,82 @@ final class JsonFieldException extends FormatException {
   final String wanted;
 }
 
+/// The most objects and lists a [JsonObject] holds one inside another,
+/// counting itself: `{"a": [{}]}` is 3 deep. Anything deeper is refused at
+/// every door with a [FormatException], since walking it (in a copy, in
+/// `jsonEncode`, in `==`, in a recursive `fromJson`) would run out of stack
+/// with a `StackOverflowError`, which `on FormatException` does not catch.
+/// `jsonEncode` itself runs out somewhere between 1,000 and 5,000 levels.
+const jsonObjectNestingLimit = 512;
+
+/// The depth of the deepest of [values], already frozen: a [JsonObject]'s
+/// own, a list's one more than its deepest element's, anything else 0.
+int _deepestValue(Iterable<Object?> values) {
+  var deepest = 0;
+  for (final v in values) {
+    final d = switch (v) {
+      final JsonObject o => o._depth,
+      final List<Object?> l => 1 + _deepestValue(l),
+      _ => 0,
+    };
+    if (d > deepest) deepest = d;
+  }
+  return deepest;
+}
+
 /// [fields] copied for a [JsonObject]: each value as [_frozen] makes it,
-/// found at its key.
+/// found at its key, one level inside the object being made.
 Map<String, Object?> _frozenFields(Map<String, Object?> fields) =>
     Map.unmodifiable({
       for (final MapEntry(:key, :value) in fields.entries)
-        key: _frozen(value, key),
+        key: _frozen(value, key, 1),
     });
 
-/// [value], found at [at], copied all the way down: each map into a
-/// [JsonObject] and each list into one that refuses changes. A
-/// [JsonObject] is kept as it is.
-Object? _frozen(Object? value, String at) => switch (value) {
+/// [value], found at [at] with [above] objects and lists around it, copied
+/// all the way down: each map into a [JsonObject] and each list into one
+/// that refuses changes. A [JsonObject] is kept as it is.
+Object? _frozen(Object? value, String at, int above) => switch (value) {
       null || bool() || String() => value,
       final num n when n.isFinite => n,
+      final JsonObject o when above + o._depth > jsonObjectNestingLimit =>
+        throw _tooDeep(at),
       final JsonObject o => o,
-      final Map<Object?, Object?> m => JsonObject._(Map.unmodifiable({
+      Map<Object?, Object?>() ||
+      List<Object?>() when above >= jsonObjectNestingLimit =>
+        throw _tooDeep(at),
+      final Map<Object?, Object?> m => JsonObject._frozen(Map.unmodifiable({
           for (final MapEntry(:key, :value) in m.entries)
-            _stringKey(key, at): _frozen(value, '$at.$key'),
+            _stringKey(key, at): _frozen(value, '$at.$key', above + 1),
         })),
       final List<Object?> l => List<Object?>.unmodifiable([
-          for (final (i, x) in l.indexed) _frozen(x, '$at[$i]'),
+          for (final (i, x) in l.indexed) _frozen(x, '$at[$i]', above + 1),
         ]),
       _ => throw JsonFieldException(at, 'a JSON value'),
     };
 
-/// [m], fresh from `jsonDecode` and seen by no one else, as a [JsonObject]
-/// without copying it: each object inside is wrapped in place, and each list
-/// is wrapped in a view that refuses changes.
-JsonObject _wrapDecodedObject(Map<String, Object?> m) {
-  m.updateAll((_, v) => _wrapDecoded(v));
-  return JsonObject._(m);
+JsonFieldException _tooDeep(String at) => JsonFieldException(
+    at, 'within $jsonObjectNestingLimit levels of objects and lists');
+
+/// [m], fresh from `jsonDecode` and seen by no one else, at [depth] (the
+/// outermost object is 1), as a [JsonObject] without copying it: each
+/// object inside is wrapped in place, and each list is wrapped in a view
+/// that refuses changes.
+JsonObject _wrapDecodedObject(Map<String, Object?> m, int depth) {
+  m.updateAll((_, v) => _wrapDecoded(v, depth + 1));
+  return JsonObject._frozen(m);
 }
 
-Object? _wrapDecoded(Object? v) {
+Object? _wrapDecoded(Object? v, int depth) {
+  if ((v is Map || v is List) && depth > jsonObjectNestingLimit) {
+    throw const FormatException(
+        'objects and lists nested more than $jsonObjectNestingLimit deep');
+  }
   switch (v) {
     case final Map<String, Object?> m:
-      return _wrapDecodedObject(m);
+      return _wrapDecodedObject(m, depth);
     case final List<Object?> l:
       for (var i = 0; i < l.length; i++) {
-        l[i] = _wrapDecoded(l[i]);
+        l[i] = _wrapDecoded(l[i], depth + 1);
       }
       return UnmodifiableListView(l);
     default:
