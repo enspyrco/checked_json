@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.1
+
+- `JsonObject` is a final class that is a read-only `Map<String, Object?>`,
+  no longer an extension type. A map is never a `JsonObject` at runtime:
+  `map as JsonObject` throws a `TypeError` and `map is JsonObject` is false,
+  so only the doors make one. Code that cast or type-tested a decoded map
+  against `JsonObject` changes behaviour; `JsonObject.parse` is the door for
+  that. `jsonEncode` and map patterns read a `JsonObject` as before.
+- `obj['k']` compiles again, and is unchecked; `obj['k'] = v` compiles and
+  throws `UnsupportedError`.
+- Two `JsonObject`s are equal when their fields are equal, in any order and
+  all the way down, with a hash to match. A `JsonObject` never equals a
+  plain map.
+
 ## 0.3.0
 
 - **Breaking:** `JsonObject.decode` refuses text in which an object, at any

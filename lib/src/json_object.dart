@@ -18,22 +18,50 @@ import 'decode_json.dart';
 /// one of the wrong type. A default for an absent field is the caller's `??`,
 /// so the default sits where it is used.
 ///
-/// It is not a map: a field is read through a reader or [raw], and
-/// `obj['k']` does not compile. One object is made from others with
-/// [withFields], [JsonObject.merge] and [without], each giving a new
-/// [JsonObject], so a map never has to come out to be spread. It does
-/// implement [Object], so it is never null and an extension on
-/// `T extends Object` applies to it.
+/// It is a map that refuses changes, so `jsonEncode`, a map pattern and a
+/// test's map matcher each read it as one. A field is still read through a
+/// reader, which checks its type; one object is made from others with
+/// [withFields], [JsonObject.merge] and [without].
 ///
-/// The type is erased at runtime: `x as JsonObject` is
-/// `x as Map<String, Object?>`, and fails with a [TypeError] where a door
-/// would have thrown a [FormatException]. Use [parse] instead, and the same
-/// goes for `is JsonObject` and a `JsonObject` pattern.
-extension type const JsonObject._(Map<String, Object?> _fields)
-    implements Object {
+/// A map is never a [JsonObject] at runtime, so `map as JsonObject` throws
+/// and `map is JsonObject` is false: the doors are the only way in.
+final class JsonObject extends UnmodifiableMapBase<String, Object?> {
+  const JsonObject._(this._fields);
+
+  final Map<String, Object?> _fields;
+
   /// An object built from a map we wrote, as a `toJson` returns it. A map
   /// literal is one; so is any map whose type already says string keys.
-  const JsonObject.of(Map<String, Object?> fields) : this._(fields);
+  const JsonObject.of(Map<String, Object?> fields) : _fields = fields;
+
+  @override
+  Object? operator [](Object? key) => _fields[key];
+
+  @override
+  bool containsKey(Object? key) => _fields.containsKey(key);
+
+  @override
+  int get length => _fields.length;
+
+  @override
+  bool get isEmpty => _fields.isEmpty;
+
+  @override
+  Iterable<MapEntry<String, Object?>> get entries => _fields.entries;
+
+  /// Two objects are equal when they have the same fields with equal values,
+  /// in any order, all the way down; `1` and `1.0` are equal, as in Dart.
+  /// The hash is of the fields as they are now, so an object whose map is
+  /// still being changed should not be kept in a set.
+  @override
+  bool operator ==(Object other) =>
+      other is JsonObject && _jsonEquals(_fields, other._fields);
+
+  @override
+  int get hashCode => _jsonHash(_fields);
+
+  @override
+  String toString() => _fields.toString();
 
   /// A copy of [fields] that refuses changes, for an object kept for the
   /// life of a conversation. Nested objects and lists are shared, not
@@ -65,7 +93,11 @@ extension type const JsonObject._(Map<String, Object?> _fields)
   /// string-keyed. A `Map<dynamic, dynamic>`, as YAML and Flutter platform
   /// channels deliver one, is not a JSON object here even when every key is
   /// a string: copy it with `Map<String, Object?>.from` first.
+  ///
+  /// A [JsonObject] placed inside another, as [withFields] or a `toJson`
+  /// can place one, is itself.
   static JsonObject? parse(Object? value) => switch (value) {
+        final JsonObject o => o,
         final Map<String, Object?> m => JsonObject._(m),
         _ => null,
       };
@@ -79,6 +111,7 @@ extension type const JsonObject._(Map<String, Object?> _fields)
 
   /// The field names, for an object used as a dictionary, whose keys are
   /// data rather than names the code knows. Read each value with a reader.
+  @override
   Iterable<String> get keys => _fields.keys;
 
   /// This object with [more] laid over it: a new field is added after the
@@ -206,6 +239,7 @@ final class JsonFieldException extends FormatException {
 Object? _deepFrozen(Object? value, String at) => switch (value) {
       null || bool() || String() => value,
       final num n when n.isFinite => n,
+      final JsonObject o => _deepFrozen(o._fields, at),
       final Map<Object?, Object?> m => Map<String, Object?>.unmodifiable({
           for (final MapEntry(:key, :value) in m.entries)
             _stringKey(key, at): _deepFrozen(value, '$at.$key'),
@@ -214,6 +248,33 @@ Object? _deepFrozen(Object? value, String at) => switch (value) {
           for (final (i, x) in l.indexed) _deepFrozen(x, '$at[$i]'),
         ]),
       _ => throw JsonFieldException(at, 'a JSON value'),
+    };
+
+/// Whether [a] and [b] are the same JSON value: objects by their fields in
+/// any order, lists element by element, anything else by `==`.
+bool _jsonEquals(Object? a, Object? b) => switch ((a, b)) {
+      (final JsonObject x, _) => _jsonEquals(x._fields, b),
+      (_, final JsonObject y) => _jsonEquals(a, y._fields),
+      (final Map<Object?, Object?> x, final Map<Object?, Object?> y) =>
+        x.length == y.length &&
+            x.entries.every(
+                (e) => y.containsKey(e.key) && _jsonEquals(e.value, y[e.key])),
+      (final List<Object?> x, final List<Object?> y) => x.length == y.length &&
+          [for (var i = 0; i < x.length; i++) i]
+              .every((i) => _jsonEquals(x[i], y[i])),
+      _ => a == b,
+    };
+
+/// A hash agreeing with [_jsonEquals]: an object's fields are combined
+/// without regard to order.
+int _jsonHash(Object? v) => switch (v) {
+      final JsonObject o => _jsonHash(o._fields),
+      final Map<Object?, Object?> m => Object.hashAllUnordered([
+          for (final MapEntry(:key, :value) in m.entries)
+            Object.hash(key, _jsonHash(value)),
+        ]),
+      final List<Object?> l => Object.hashAll(l.map(_jsonHash)),
+      _ => v.hashCode,
     };
 
 /// [key] of the object at [at], refused unless it is a string.

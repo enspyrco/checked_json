@@ -84,16 +84,20 @@ you're meant to catch, not a programming bug. Code that already catches
 
 ## What it guarantees, and what it doesn't yet
 
-- **`as JsonObject` and `is JsonObject` do not check.** An extension type is
-  erased at runtime, so `x as JsonObject` is `x as Map<String, Object?>` and
-  fails with a `TypeError` where a door would have thrown a
-  `FormatException`. Use `JsonObject.parse` instead, and the same goes for a
-  `JsonObject` pattern.
-- **A `JsonObject` is not a `Map`.** `obj['k']` does not compile, and
-  neither does `obj['k'] = v`, so a field is read through a reader or `raw`,
-  and nothing outside the library writes to one. (Up to 0.1.x it
-  implemented `Map<String, Object?>`.) It does implement `Object`, so it is
-  never null and an extension on `T extends Object` applies to it.
+- **A map is never a `JsonObject`.** `JsonObject` is a final class, so
+  `map as JsonObject` throws a `TypeError` and `map is JsonObject` is false,
+  even for `jsonDecode` output: the doors (`decode`, `parse`, `of`, a
+  reader) are the only way to get one. A `case final JsonObject o` on a
+  decoded value never matches; use `JsonObject.parse`.
+- **A `JsonObject` is a read-only `Map<String, Object?>`.** `jsonEncode`, a
+  map pattern and a test's map matcher read it as one. `obj['k']` compiles
+  and is unchecked, so read a field through a reader. `obj['k'] = v` also
+  compiles, and throws `UnsupportedError`.
+- **Two objects are equal when their fields are.** Fields compare in any
+  order, all the way down, with `1` equal to `1.0` as in Dart. A
+  `JsonObject` never equals a plain map with the same fields. The hash is of
+  the fields as they are now, so don't keep one in a set while the map it
+  was made `of` is still changing.
 - **`parse` matches the map's runtime type.** `jsonDecode` always makes a
   string-keyed map, so its output is fine. A `Map<dynamic, dynamic>`, as YAML
   and Flutter platform channels deliver one, gives null even when every key is
