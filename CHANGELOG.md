@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1
+
+- Fixes a 0.4.0 regression: `JsonObject.decode` and `JsonObject.parse` ran
+  out of stack on deeply nested JSON (a `StackOverflowError` at 5,000
+  levels, a 30 KB body), which `on FormatException` does not catch. A
+  `JsonObject` now holds at most `jsonObjectNestingLimit` (512) objects and
+  lists one inside another, counting itself. Anything deeper is refused at
+  every door: a `FormatException` from `decode`, and a
+  `JsonFieldException` naming where it is from `of`, `parse`, `withFields`
+  and `MutableJsonObject`. This holds for objects nested one `of` at a time
+  too, so `jsonEncode`, `==` and a recursive `fromJson` never meet one
+  deeper than the limit. `jsonEncode` itself runs out of stack between
+  1,000 and 5,000 levels.
+
 ## 0.4.0
 
 - **Breaking:** nothing can change a `JsonObject`, all the way down. Every
