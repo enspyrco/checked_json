@@ -289,14 +289,6 @@ final class JsonFieldException extends FormatException {
   final String wanted;
 }
 
-/// The most objects and lists a [JsonObject] holds one inside another,
-/// counting itself: `{"a": [{}]}` is 3 deep. Anything deeper is refused at
-/// every door with a [FormatException], since walking it (in a copy, in
-/// `jsonEncode`, in `==`, in a recursive `fromJson`) would run out of stack
-/// with a `StackOverflowError`, which `on FormatException` does not catch.
-/// `jsonEncode` itself runs out somewhere between 1,000 and 5,000 levels.
-const jsonObjectNestingLimit = 512;
-
 /// The depth of the deepest of [values], already frozen: a [JsonObject]'s
 /// own, a list's one more than its deepest element's, anything else 0.
 int _deepestValue(Iterable<Object?> values) {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.2
+
+- `decodeJsonRefusingDuplicateKeysAndUnsafeIntegers` now refuses objects
+  and lists nested more than `jsonObjectNestingLimit` (512) deep, with a
+  `FormatException`, as `JsonObject.decode` does. 0.4.1 put the limit on
+  every way into a `JsonObject` but not on this function, so code that
+  decoded with it and walked the result itself could still be ended by a
+  `StackOverflowError`. A test now holds that the function and
+  `JsonObject.decode` refuse the same inputs.
+
 ## 0.4.1
 
 - Fixes a 0.4.0 regression: `JsonObject.decode` and `JsonObject.parse` ran

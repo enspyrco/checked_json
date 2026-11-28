@@ -128,7 +128,8 @@ you're meant to catch, not a programming bug. Code that already catches
   value is an object; each field is checked when its reader reads it.
 - **Nesting stops at 512 levels.** An object holds at most
   `jsonObjectNestingLimit` objects and lists one inside another, counting
-  itself, and every door refuses deeper input with a `FormatException`.
+  itself, and every door refuses deeper input with a `FormatException`, as
+  `decodeJsonRefusingDuplicateKeysAndUnsafeIntegers` does.
   Without the limit, a 30 KB body nested 5,000 deep would end the program
   with a `StackOverflowError`, here or in `jsonEncode`.
 
