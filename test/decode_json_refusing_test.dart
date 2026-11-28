@@ -135,4 +135,80 @@ void main() {
   test('JsonObject.decode still refuses JSON of another kind', () {
     expect(() => JsonObject.decode('[1]'), throwsFormatException);
   });
+
+  _integerFieldsAsStrings();
+}
+
+void _integerFieldsAsStrings() {
+  group('a field named in integerFieldsAsStrings', () {
+    const named = {'id'};
+    Object? decode(String text) =>
+        decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(
+          text,
+          integerFieldsAsStrings: named,
+        );
+
+    test('comes back as its digits, exactly, past 2^53', () {
+      expect(
+        decode('[{"id": 3856380378147192832, "guid": "g"}]'),
+        [
+          {'id': '3856380378147192832', 'guid': 'g'},
+        ],
+      );
+    });
+
+    test('is a string when it is small, too', () {
+      expect(JsonObject.decode('{"id": 7}', integerFieldsAsStrings: named),
+          JsonObject.of({'id': '7'}));
+    });
+
+    test('keeps its minus sign', () {
+      expect(decode('{"id": -12}'), {'id': '-12'});
+    });
+
+    test('is read at any depth', () {
+      expect(
+        decode('{"a": {"b": [{"id": 9007199254740993}]}}'),
+        {
+          'a': {
+            'b': [
+              {'id': '9007199254740993'},
+            ],
+          },
+        },
+      );
+    });
+
+    test('is matched once its key is unescaped', () {
+      expect(decode('{"${_bs}u0069d": 1}'), {'id': '1'});
+    });
+
+    test('leaves a fraction, an exponent, a string and a list alone', () {
+      const text = '[{"id": 1.5}, {"id": 1e3}, {"id": "x"}, {"id": [1, 2]}]';
+      expect(decode(text), jsonDecode(text));
+    });
+
+    test('changes no other field, and no field named like it as a value', () {
+      const text = '{"n": 1, "k": "id", "l": ["id", 2], "id": 3}';
+      expect(decode(text), {
+        'n': 1,
+        'k': 'id',
+        'l': ['id', 2],
+        'id': '3',
+      });
+    });
+
+    test('an unsafe integer in any other field is still refused', () {
+      expect(() => decode('{"id": 1, "n": 9007199254740993}'),
+          throwsFormatException);
+    });
+
+    test('a duplicate key is still refused', () {
+      expect(() => decode('{"id": 1, "id": 2}'), throwsFormatException);
+    });
+
+    test('text that is not JSON still fails as jsonDecode fails', () {
+      expect(() => decode('{"id": 1'), throwsFormatException);
+    });
+  });
 }

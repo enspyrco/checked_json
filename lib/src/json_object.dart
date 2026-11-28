@@ -88,9 +88,17 @@ final class JsonObject extends UnmodifiableMapBase<String, Object?> {
   /// [text] decoded as a JSON object. A [FormatException] when it is not
   /// JSON, is JSON of another kind (a list, a string, a number, null), names
   /// a key twice in one object, or has an integer past 2^53 - 1; see
-  /// [decodeJsonRefusingDuplicateKeysAndUnsafeIntegers].
-  factory JsonObject.decode(String text) =>
-      switch (decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(text)) {
+  /// [decodeJsonRefusingDuplicateKeysAndUnsafeIntegers], which also says how
+  /// a field named in [integerFieldsAsStrings] is read: an integer there,
+  /// such as a 64-bit id, comes back as a string of its digits.
+  factory JsonObject.decode(
+    String text, {
+    Set<String> integerFieldsAsStrings = const {},
+  }) =>
+      switch (decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(
+        text,
+        integerFieldsAsStrings: integerFieldsAsStrings,
+      )) {
         final Map<String, Object?> m => _wrapDecodedObject(m),
         _ => throw const FormatException('not a JSON object'),
       };

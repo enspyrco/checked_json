@@ -13,6 +13,13 @@
   that is not a string) with a `JsonFieldException` naming where it is.
 - **Breaking:** `frozen()`, `deepFrozen()` and `JsonObject.unmodifiable` are
   gone, since every `JsonObject` is already what they made: drop the call.
+- New `integerFieldsAsStrings` on `JsonObject.decode` and
+  `decodeJsonRefusingDuplicateKeysAndUnsafeIntegers`. A field named there,
+  at any depth, whose value is written as an integer comes back as a string
+  of exactly its digits, whatever its size and on every platform. This is
+  for an id an API writes as a 64-bit number, such as a GitHub webhook
+  delivery id, which a web build would round and the integer check would
+  otherwise refuse. Such a field is a string even when it is small.
 - New `MutableJsonObject`, a map you can write to for building one field by
   field. It checks and copies each value as it is written, so a bad value
   fails at the line that wrote it. `toJsonObject()` turns it into a

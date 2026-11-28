@@ -27,6 +27,19 @@ it:
   key twice, or has an integer past 2^53 - 1 in size, which a web build reads
   inexactly. A number written with a `.` or an exponent is a double and is
   rounded to the nearest one, the same on every platform.
+
+  An API that writes a 64-bit id as a number, as GitHub does for a webhook
+  delivery, can't be read exactly as a number on the web, so name the field
+  and it comes back as a string of its digits, at any depth and whatever its
+  size:
+
+  ```dart
+  final deliveries = decodeJsonRefusingDuplicateKeysAndUnsafeIntegers(
+    text,
+    integerFieldsAsStrings: {'id'},
+  );
+  // [{'id': '3856380378147192832', ...}] on the VM and on the web
+  ```
 - `JsonObject.parse(value)` for a value that is already decoded. Null when it
   is not a JSON object. A duplicate's value is already gone from a decoded
   value, and a big integer already rounded on the web, so for wire text of
